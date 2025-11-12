@@ -1,13 +1,14 @@
 import tkinter as tk
 from tkinter import ttk
 from pycaw.pycaw import AudioUtilities
+import keyboard
 
 
 class VolumeBalancer:
     def __init__(self, root):
         self.root = root
         self.root.title("Volume Balancer")
-        self.root.geometry("500x300")
+        self.root.geometry("500x350")
         
         self.process1 = None
         self.process2 = None
@@ -16,7 +17,10 @@ class VolumeBalancer:
         self.balance_var = tk.DoubleVar(value=0.0)
         
         self.create_widgets()
+        self.setup_hotkeys()
         self.refresh_processes()
+        
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
     def create_widgets(self):
         # Process 1 selection
@@ -82,6 +86,26 @@ class VolumeBalancer:
         )
         refresh_btn.pack(pady=10)
         
+        # Hotkey help label
+        help_text = f"Global Hotkeys: Ctrl + Alt + Left/Right adjust balance | Ctrl + Shift + Left/Right/Up set extremes"
+
+        tk.Label(self.root, text=help_text, font=("Arial", 7), fg="gray").pack(pady=5)
+    
+    def setup_hotkeys(self):
+        keyboard.add_hotkey('ctrl+alt+left', lambda: self.set_balance(self.balance_var.get() - 0.1))
+        keyboard.add_hotkey('ctrl+alt+right', lambda: self.set_balance(self.balance_var.get() + 0.1))
+        keyboard.add_hotkey('ctrl+shift+left', lambda: self.set_balance(-1.0))
+        keyboard.add_hotkey('ctrl+shift+right', lambda: self.set_balance(1.0))
+        keyboard.add_hotkey('ctrl+shift+up', lambda: self.set_balance(0.0))
+    
+    def on_closing(self):
+        """Cleanup when window closes"""
+        try:
+            keyboard.unhook_all()
+        except:
+            pass
+        self.root.destroy()
+        
     def get_audio_processes(self):
         """Get list of processes with audio sessions"""
         processes = {}
@@ -104,21 +128,22 @@ class VolumeBalancer:
     
     def refresh_processes(self):
         """Refresh the process list in dropdowns"""
-        processes = self.get_audio_processes()
-        process_list = sorted(processes.keys())
+        self.audio_sessions = self.get_audio_processes()
+        self.update_comboboxes()
         
-        # Update comboboxes
-        self.process1_combo['values'] = process_list
-        self.process2_combo['values'] = process_list
-        
-        # Store audio sessions
-        self.audio_sessions = processes
-        
+    def update_comboboxes(self):
+        process_list = sorted(self.audio_sessions.keys())
+        self.process1_combo['values'] = [el for el in process_list if el != self.process2]
+        self.process2_combo['values'] = [el for el in process_list if el != self.process1]
+
+        print([el for el in process_list if el != self.process2], self.process2, process_list)
+
     def on_process1_selected(self, event=None):
         """Handle Process 1 selection"""
         selected = self.process1_var.get()
         if selected in self.audio_sessions:
             self.process1 = self.audio_sessions[selected]
+            self.update_comboboxes()
             self.update_volumes()
     
     def on_process2_selected(self, event=None):
@@ -126,6 +151,7 @@ class VolumeBalancer:
         selected = self.process2_var.get()
         if selected in self.audio_sessions:
             self.process2 = self.audio_sessions[selected]
+            self.update_comboboxes()
             self.update_volumes()
 
     def clear_process1(self):
@@ -134,20 +160,21 @@ class VolumeBalancer:
             self.update_volumes()
 
     def set_balance(self, value=None):
-        if value is not None:
-            try:
-                float_value = float(value)
-                self.balance_var.set(float_value)
-            except (ValueError, TypeError):
-                pass
-        self.update_volumes()
+        def update():
+            if value is not None:
+                try:
+                    float_value = max(-1.0, min(1.0, float(value)))
+                    self.balance_var.set(float_value)
+                except (ValueError, TypeError):
+                    pass
+            self.update_volumes()
+        self.root.after(0, update)
     
     def update_volumes(self):
         """Update volumes based on balance slider"""
         balance = self.balance_var.get()
         
         try:
-
             if self.process1:
                 session1 = self.process1['session']
                 volume1 = session1.SimpleAudioVolume

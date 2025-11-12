@@ -113,15 +113,9 @@ class VolumeBalancer:
             sessions = AudioUtilities.GetAllSessions()
             for session in sessions:
                 if session.Process:
-                    process_name = session.Process.name()
-                    pid = session.Process.pid
-                    key = f"{process_name} (PID: {pid})"
+                    key = self.get_readable_process_key(session)
                     if key not in processes:
-                        processes[key] = {
-                            'name': process_name,
-                            'pid': pid,
-                            'session': session
-                        }
+                        processes[key] = session
         except Exception as e:
             print(f"Error getting audio processes: {e}")
         return processes
@@ -132,11 +126,10 @@ class VolumeBalancer:
         self.update_comboboxes()
         
     def update_comboboxes(self):
-        process_list = sorted(self.audio_sessions.keys())
-        self.process1_combo['values'] = [el for el in process_list if el != self.process2]
-        self.process2_combo['values'] = [el for el in process_list if el != self.process1]
+        process_list = self.audio_sessions.keys()
 
-        print([el for el in process_list if el != self.process2], self.process2, process_list)
+        self.process1_combo['values'] = [el for el in process_list if el != self.get_readable_process_key(self.process2)]
+        self.process2_combo['values'] = [el for el in process_list if el != self.get_readable_process_key(self.process1)]
 
     def on_process1_selected(self, event=None):
         """Handle Process 1 selection"""
@@ -159,6 +152,11 @@ class VolumeBalancer:
             self.process1 = None
             self.update_volumes()
 
+    def get_readable_process_key(self, session=None):
+        if session is None:
+            return ""
+        return f"{session.Process.name()} (PID: {session.Process.pid})"
+
     def set_balance(self, value=None):
         def update():
             if value is not None:
@@ -176,12 +174,12 @@ class VolumeBalancer:
         
         try:
             if self.process1:
-                session1 = self.process1['session']
+                session1 = self.process1
                 volume1 = session1.SimpleAudioVolume
                 volume1.SetMasterVolume(1.0 - max(balance, 0), None)
             
             if self.process2:
-                session2 = self.process2['session']
+                session2 = self.process2
                 volume2 = session2.SimpleAudioVolume
                 volume2.SetMasterVolume(1.0 + min(balance, 0), None)
         except Exception as e:

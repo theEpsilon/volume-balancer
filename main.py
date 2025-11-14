@@ -2,6 +2,25 @@ import tkinter as tk
 from tkinter import ttk
 from pycaw.pycaw import AudioUtilities
 import keyboard
+import traceback
+
+class AudioProcess:
+    def __init__(self, session = None):
+        self.session = session
+        self.initial_vol = session.SimpleAudioVolume.GetMasterVolume()
+    
+    def get_session(self):
+        return self.session
+
+    def get_initial_volume(self):
+        return self.initial_vol
+
+    def reset_volume(self):
+        try:
+            self.session.SimpleAudioVolume.SetMasterVolume(self.initial_vol, None)
+        except Exception:
+            print(traceback.print_exc())
+
 
 
 class VolumeBalancer:
@@ -99,29 +118,33 @@ class VolumeBalancer:
         keyboard.add_hotkey('ctrl+shift+up', lambda: self.set_balance(0.0))
     
     def on_closing(self):
-        """Cleanup when window closes"""
         try:
             keyboard.unhook_all()
         except:
-            pass
+            traceback.print_exc()
+        
+        if self.process1 is not None:
+            self.process1.reset_volume()
+        if self.process2 is not None:
+            self.process2.reset_volume()
+
         self.root.destroy()
         
     def get_audio_processes(self):
-        """Get list of processes with audio sessions"""
         processes = {}
         try:
             sessions = AudioUtilities.GetAllSessions()
             for session in sessions:
                 if session.Process:
-                    key = self.get_readable_process_key(session)
+                    audioProcess = AudioProcess(session)
+                    key = self.get_readable_process_key(audioProcess)
                     if key not in processes:
-                        processes[key] = session
+                        processes[key] = audioProcess
         except Exception as e:
             print(f"Error getting audio processes: {e}")
         return processes
     
     def refresh_processes(self):
-        """Refresh the process list in dropdowns"""
         self.audio_sessions = self.get_audio_processes()
         self.update_comboboxes()
         
@@ -132,7 +155,9 @@ class VolumeBalancer:
         self.process2_combo['values'] = [el for el in process_list if el != self.get_readable_process_key(self.process1)]
 
     def on_process1_selected(self, event=None):
-        """Handle Process 1 selection"""
+        if self.process1 is not None:
+            self.process1.reset_volume()
+
         selected = self.process1_var.get()
         if selected in self.audio_sessions:
             self.process1 = self.audio_sessions[selected]
@@ -140,8 +165,11 @@ class VolumeBalancer:
             self.update_volumes()
     
     def on_process2_selected(self, event=None):
-        """Handle Process 2 selection"""
         selected = self.process2_var.get()
+
+        if self.process2 is not None:
+            self.process2.reset_volume()
+
         if selected in self.audio_sessions:
             self.process2 = self.audio_sessions[selected]
             self.update_comboboxes()
@@ -152,10 +180,10 @@ class VolumeBalancer:
             self.process1 = None
             self.update_volumes()
 
-    def get_readable_process_key(self, session=None):
-        if session is None:
+    def get_readable_process_key(self, audio_process=None):
+        if audio_process is None:
             return ""
-        return f"{session.Process.name()} (PID: {session.Process.pid})"
+        return f"{audio_process.get_session().Process.name()} (PID: {audio_process.get_session().Process.pid})"
 
     def set_balance(self, value=None):
         def update():
@@ -169,17 +197,16 @@ class VolumeBalancer:
         self.root.after(0, update)
     
     def update_volumes(self):
-        """Update volumes based on balance slider"""
         balance = self.balance_var.get()
         
         try:
             if self.process1:
-                session1 = self.process1
+                session1 = self.process1.get_session()
                 volume1 = session1.SimpleAudioVolume
                 volume1.SetMasterVolume(1.0 - max(balance, 0), None)
             
             if self.process2:
-                session2 = self.process2
+                session2 = self.process2.get_session()
                 volume2 = session2.SimpleAudioVolume
                 volume2.SetMasterVolume(1.0 + min(balance, 0), None)
         except Exception as e:

@@ -15,11 +15,14 @@ class AudioProcess:
     def get_initial_volume(self):
         return self.initial_vol
 
-    def reset_volume(self):
+    def set_volume(self, volume):
         try:
-            self.session.SimpleAudioVolume.SetMasterVolume(self.initial_vol, None)
+            self.session.SimpleAudioVolume.SetMasterVolume(volume, None)
         except Exception:
             print(traceback.print_exc())
+
+    def reset_volume(self):
+        self.set_volume(self.initial_vol)
 
 
 
@@ -198,24 +201,18 @@ class VolumeBalancer:
     
     def update_volumes(self):
         balance = self.balance_var.get()
+
+        if self.process1:
+            self.process1.set_volume(1.0 - max(balance, 0))
         
-        try:
-            if self.process1:
-                session1 = self.process1.get_session()
-                volume1 = session1.SimpleAudioVolume
-                volume1.SetMasterVolume(1.0 - max(balance, 0), None)
-            
-            if self.process2:
-                session2 = self.process2.get_session()
-                volume2 = session2.SimpleAudioVolume
-                volume2.SetMasterVolume(1.0 + min(balance, 0), None)
-        except Exception as e:
-            print(f"Error updating volumes: {e}")
+        if self.process2:
+            self.process2.set_volume(1.0 + min(balance, 0))
 
 
 def main():
     root = tk.Tk()
-    app = VolumeBalancer(root)
+    VolumeBalancer(root)  # Instance must be created to initialize the app
+    root.iconbitmap("./app.ico")
     root.mainloop()
 
 

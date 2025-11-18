@@ -24,6 +24,15 @@ class AudioProcess:
     def reset_volume(self):
         self.set_volume(self.initial_vol)
 
+    def get_session_name(self):
+        return self.session.Process.name()
+
+    def get_session_pid(self):
+        return self.session.Process.pid
+
+    def get_readable_process_key(self):
+        return f"{self.get_session_name()} (PID: {self.get_session_pid()})"
+
 
 
 class VolumeBalancer:
@@ -41,6 +50,7 @@ class VolumeBalancer:
         self.create_widgets()
         self.setup_hotkeys()
         self.refresh_processes()
+        self.update_balance_labels()  # Initialize labels
         
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
@@ -94,10 +104,15 @@ class VolumeBalancer:
         
         # Balance labels
         balance_frame = tk.Frame(self.root)
-        balance_frame.pack(pady=5)
-        tk.Label(balance_frame, text="Process 1", font=("Arial", 8)).pack(side=tk.LEFT, padx=50)
-        tk.Label(balance_frame, text="Balanced", font=("Arial", 8)).pack(side=tk.LEFT, padx=50)
-        tk.Label(balance_frame, text="Process 2", font=("Arial", 8)).pack(side=tk.LEFT, padx=50)
+        balance_frame.pack(pady=5, padx=45, fill=tk.X, expand=True)
+        
+        self.process1_label = tk.Label(balance_frame, text="Process 1", font=("Arial", 8))
+        self.process1_label.pack(side=tk.LEFT)
+        
+        tk.Label(balance_frame, text="Balanced", font=("Arial", 8)).place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        
+        self.process2_label = tk.Label(balance_frame, text="Process 2", font=("Arial", 8))
+        self.process2_label.pack(side=tk.RIGHT)
         
         # Refresh button
         refresh_btn = tk.Button(
@@ -109,7 +124,7 @@ class VolumeBalancer:
         refresh_btn.pack(pady=10)
         
         # Hotkey help label
-        help_text = f"Global Hotkeys: Ctrl + Alt + Left/Right adjust balance | Ctrl + Shift + Left/Right/Up set extremes"
+        help_text = f"Hotkeys: Ctrl + Alt + Left/Right adjust balance | Ctrl + Shift + Left/Right/Down set extremes"
 
         tk.Label(self.root, text=help_text, font=("Arial", 7), fg="gray").pack(pady=5)
     
@@ -118,6 +133,7 @@ class VolumeBalancer:
         keyboard.add_hotkey('ctrl+alt+right', lambda: self.set_balance(self.balance_var.get() + 0.1))
         keyboard.add_hotkey('ctrl+shift+left', lambda: self.set_balance(-1.0))
         keyboard.add_hotkey('ctrl+shift+right', lambda: self.set_balance(1.0))
+        keyboard.add_hotkey('ctrl+shift+down', lambda: self.set_balance(0.0))
         keyboard.add_hotkey('ctrl+shift+up', lambda: self.set_balance(0.0))
     
     def on_closing(self):
@@ -140,7 +156,7 @@ class VolumeBalancer:
             for session in sessions:
                 if session.Process:
                     audioProcess = AudioProcess(session)
-                    key = self.get_readable_process_key(audioProcess)
+                    key = audioProcess.get_readable_process_key()
                     if key not in processes:
                         processes[key] = audioProcess
         except Exception as e:
@@ -153,9 +169,28 @@ class VolumeBalancer:
         
     def update_comboboxes(self):
         process_list = self.audio_sessions.keys()
+        key1, key2 = "", ""
 
-        self.process1_combo['values'] = [el for el in process_list if el != self.get_readable_process_key(self.process2)]
-        self.process2_combo['values'] = [el for el in process_list if el != self.get_readable_process_key(self.process1)]
+        if self.process1:
+            key1 = self.process1.get_readable_process_key()
+        if self.process2:
+            key2 = self.process2.get_readable_process_key()
+
+        self.process1_combo['values'] = [el for el in process_list if el != key2]
+        self.process2_combo['values'] = [el for el in process_list if el != key1]
+    
+    def update_balance_labels(self):
+        process1_name = self.process1.get_session_name() if self.process1 else "None selected"
+        process2_name = self.process2.get_session_name() if self.process2 else "None selected"
+
+        if len(process1_name) > 20:
+            process1_name = f"{process1_name[:20]}..."
+
+        if len(process2_name) > 20:
+            process2_name = f"{process2_name[:20]}..."
+
+        self.process1_label.config(text=process1_name)
+        self.process2_label.config(text=process2_name)
 
     def on_process1_selected(self, event=None):
         if self.process1 is not None:
@@ -165,6 +200,7 @@ class VolumeBalancer:
         if selected in self.audio_sessions:
             self.process1 = self.audio_sessions[selected]
             self.update_comboboxes()
+            self.update_balance_labels()
             self.update_volumes()
     
     def on_process2_selected(self, event=None):
@@ -176,17 +212,14 @@ class VolumeBalancer:
         if selected in self.audio_sessions:
             self.process2 = self.audio_sessions[selected]
             self.update_comboboxes()
+            self.update_balance_labels()
             self.update_volumes()
 
     def clear_process1(self):
         if self.process1:
             self.process1 = None
+            self.update_balance_labels()
             self.update_volumes()
-
-    def get_readable_process_key(self, audio_process=None):
-        if audio_process is None:
-            return ""
-        return f"{audio_process.get_session().Process.name()} (PID: {audio_process.get_session().Process.pid})"
 
     def set_balance(self, value=None):
         def update():
@@ -211,7 +244,7 @@ class VolumeBalancer:
 
 def main():
     root = tk.Tk()
-    VolumeBalancer(root)  # Instance must be created to initialize the app
+    VolumeBalancer(root)
     root.iconbitmap("./app.ico")
     root.mainloop()
 

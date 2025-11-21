@@ -39,7 +39,8 @@ class VolumeBalancer:
     def __init__(self, root):
         self.root = root
         self.root.title("Volume Balancer")
-        self.root.geometry("500x350")
+        self.root.geometry("500x325")
+        self.root.minsize(500, 325)
         
         self.process1 = None
         self.process2 = None
@@ -47,47 +48,63 @@ class VolumeBalancer:
 
         self.balance_var = tk.DoubleVar(value=0.0)
         
-        self.create_widgets()
+        self._create_widgets()
         self.setup_hotkeys()
         self.refresh_processes()
-        self.update_balance_labels()  # Initialize labels
+        self.update_balance_labels()
         
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
-    def create_widgets(self):
+
+    def _create_widgets(self):
         # Process 1 selection
-        tk.Label(self.root, text="Audio Source 1:", font=("Arial", 10)).pack(pady=5)
+        process1_frame = tk.Frame(self.root)
+        process1_frame.pack(pady=(10, 5))
+
+        tk.Label(process1_frame, text="Audio Source 1:", font=("Arial", 10)).grid(row=0, column=0, columnspan=2)
+
         self.process1_var = tk.StringVar()
         self.process1_combo = ttk.Combobox(
-            self.root, 
+            process1_frame,
             textvariable=self.process1_var,
             width=40,
             state="readonly"
         )
-        self.process1_combo.pack(pady=5)
         self.process1_combo.bind("<<ComboboxSelected>>", self.on_process1_selected)
+        self.process1_combo.grid(row=1, column=0)
+        
+        tk.Button(process1_frame, text="unset", command=lambda: self.clear_process1()).grid(row=1, column=1, padx=(10, 0))
         
         # Process 2 selection
-        tk.Label(self.root, text="Audio Source 2:", font=("Arial", 10)).pack(pady=5)
+        process2_frame = tk.Frame(self.root)
+        process2_frame.pack(pady=5)
+
+        tk.Label(process2_frame, text="Audio Source 2:", font=("Arial", 10)).grid(row=0, column=0, columnspan=2)
+
         self.process2_var = tk.StringVar()
         self.process2_combo = ttk.Combobox(
-            self.root, 
+            process2_frame, 
             textvariable=self.process2_var,
             width=40,
             state="readonly"
         )
-        self.process2_combo.pack(pady=5)
+        self.process2_combo.grid(row=1, column=0)
         self.process2_combo.bind("<<ComboboxSelected>>", self.on_process2_selected)
+
+        tk.Button(process2_frame, text="unset").grid(row=1, column=1, padx=(10, 0))
         
-        # Volume balance slider
-        tk.Label(self.root, text="Volume Balance:", font=("Arial", 10)).pack(pady=10)
+        # Volume Balancer
+        balancer_frame = tk.Frame(self.root)
+        balancer_frame.pack(pady=(20, 0))
+
+        tk.Label(balancer_frame, text="Volume Balance:", font=("Arial", 10)).pack()
         
-        # Create a frame to hold buttons and slider horizontally
-        slider_frame = tk.Frame(self.root)
-        slider_frame.pack(pady=5)
+        ## Balance slider
+        slider_frame = tk.Frame(balancer_frame)
+        slider_frame.pack()
         
         tk.Label(slider_frame, text="v", font=("Arial", 10)).pack(side=tk.TOP)
         tk.Button(slider_frame, text="<<", command=lambda: self.set_balance(-1.0), height=1, width=2).pack(side=tk.LEFT, padx=5)
+
         self.balance_slider = tk.Scale(
             slider_frame,
             from_=-1.0,
@@ -100,18 +117,19 @@ class VolumeBalancer:
             showvalue=False
         )
         self.balance_slider.pack(side=tk.LEFT, padx=5)
+
         tk.Button(slider_frame, text=">>", command=lambda: self.set_balance(1.0), height=1, width=2).pack(side=tk.LEFT, padx=5)
         
-        # Balance labels
-        balance_frame = tk.Frame(self.root)
-        balance_frame.pack(pady=5, padx=45, fill=tk.X, expand=True)
+        ## Balance labels
+        balance_label_frame = tk.Frame(balancer_frame)
+        balance_label_frame.pack(fill=tk.X, expand=True, padx=40)
         
-        self.process1_label = tk.Label(balance_frame, text="Process 1", font=("Arial", 8))
+        self.process1_label = tk.Label(balance_label_frame, text="Process 1", font=("Arial", 8))
         self.process1_label.pack(side=tk.LEFT)
         
-        tk.Label(balance_frame, text="Balanced", font=("Arial", 8)).place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        tk.Label(balance_label_frame, text="Balanced", font=("Arial", 8)).place(relx=0.5, rely=0.5, anchor=tk.CENTER)
         
-        self.process2_label = tk.Label(balance_frame, text="Process 2", font=("Arial", 8))
+        self.process2_label = tk.Label(balance_label_frame, text="Process 2", font=("Arial", 8))
         self.process2_label.pack(side=tk.RIGHT)
         
         # Refresh button
@@ -121,11 +139,10 @@ class VolumeBalancer:
             command=self.refresh_processes,
             font=("Arial", 9)
         )
-        refresh_btn.pack(pady=10)
+        refresh_btn.pack(pady=(25, 5))
         
         # Hotkey help label
         help_text = f"Hotkeys: Ctrl + Alt + Left/Right adjust balance | Ctrl + Shift + Left/Right/Down set extremes"
-
         tk.Label(self.root, text=help_text, font=("Arial", 7), fg="gray").pack(pady=5)
     
     def setup_hotkeys(self):
@@ -165,9 +182,9 @@ class VolumeBalancer:
     
     def refresh_processes(self):
         self.audio_sessions = self.get_audio_processes()
-        self.update_comboboxes()
+        self.update_combobox_values()
         
-    def update_comboboxes(self):
+    def update_combobox_values(self):
         process_list = self.audio_sessions.keys()
         key1, key2 = "", ""
 
@@ -199,7 +216,7 @@ class VolumeBalancer:
         selected = self.process1_var.get()
         if selected in self.audio_sessions:
             self.process1 = self.audio_sessions[selected]
-            self.update_comboboxes()
+            self.update_combobox_values()
             self.update_balance_labels()
             self.update_volumes()
     
@@ -211,15 +228,25 @@ class VolumeBalancer:
 
         if selected in self.audio_sessions:
             self.process2 = self.audio_sessions[selected]
-            self.update_comboboxes()
+            self.update_combobox_values()
             self.update_balance_labels()
             self.update_volumes()
 
     def clear_process1(self):
         if self.process1:
+            self.process1_var.set("")
+            self.process1.reset_volume()
             self.process1 = None
             self.update_balance_labels()
-            self.update_volumes()
+            self.update_combobox_values()
+
+    def clear_process2(self):
+        if self.process2:
+            self.process2_var.set("")
+            self.process2.reset_volume()
+            self.process2 = None
+            self.update_balance_labels()
+            self.update_combobox_values()
 
     def set_balance(self, value=None):
         def update():

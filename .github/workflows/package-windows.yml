@@ -1,0 +1,52 @@
+name: Build Windows Executable + Source
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        arch: [x64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pipenv
+        run: |
+          python -m pip install --upgrade pip
+          pip install pipenv
+
+      - name: Get app version
+        id: get_version
+        run: |
+          $appVersion = python -c "import sys; sys.path.append('.'); from __version__ import __version__; print(__version__)"
+          echo "version=$appVersion" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Install dependencies
+        run: pipenv sync --dev
+
+      - name: Build executable
+        run: |
+          mkdir -p dist/${{ matrix.arch }}
+          pipenv run pyinstaller --onefile --name "Volume-Balancer_v${{ steps.get_version.outputs.version }}-${{ matrix.arch }}" main.py --distpath dist/${{ matrix.arch }}
+      
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**
+          draft: true

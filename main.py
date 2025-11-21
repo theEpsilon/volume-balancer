@@ -1,8 +1,11 @@
 import tkinter as tk
-from tkinter import ttk
-from pycaw.pycaw import AudioUtilities
 import keyboard
 import traceback
+
+from tkinter import ttk
+from pycaw.pycaw import AudioUtilities
+from __version__ import __version__
+
 
 class AudioProcess:
     def __init__(self, session = None):
@@ -38,7 +41,7 @@ class AudioProcess:
 class VolumeBalancer:
     def __init__(self, root):
         self.root = root
-        self.root.title("Volume Balancer")
+        self.root.title(f"Volume Balancer v{__version__}")
         self.root.geometry("500x325")
         self.root.minsize(500, 325)
         
@@ -267,7 +270,6 @@ class VolumeBalancer:
         
         if self.process2:
             self.process2.set_volume(1.0 + min(balance, 0))
-
 
 def main():
     root = tk.Tk()

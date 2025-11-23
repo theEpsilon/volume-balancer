@@ -7,9 +7,9 @@ name = "pypi"
 pycaw = "*"
 keyboard = "*"
 
-[dev-packages]
-pyinstaller = "*"
-bump2version = "*"
-
 [requires]
 python_version = "3.12"
+
+[dev-packages]
+bump2version = "*"
+pyinstaller = "*"

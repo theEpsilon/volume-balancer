@@ -4,7 +4,7 @@ import traceback
 
 from tkinter import ttk
 from pycaw.pycaw import AudioUtilities
-from __version__ import __version__
+from src.__version__ import __version__
 
 
 class AudioProcess:

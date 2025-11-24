@@ -182,7 +182,7 @@ class VolumeBalancer:
                     if key not in processes:
                         processes[key] = audioProcess
         except Exception as e:
-            print(f"Error getting audio processes: {e}")
+            print(f"Error getting audio processes:", traceback.format_exc())
         return processes
     
     def refresh_processes(self):

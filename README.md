@@ -2,25 +2,26 @@
 
 A simple Windows app to balance the volume of two processes.
 
-![app screenshot](volume_balancer_v0.png)
+![app screenshot](assets/volume_balancer_v0.png)
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.12+
+- Pipenv
 - Windows OS
 
 ## Installation
 
 1. Install the required dependencies:
 ```bash
-pip install -r requirements.txt
+pipenv sync
 ```
 
 ## Usage
 
-Run the application:
+Run the application from project root:
 ```bash
-python main.py
+pipenv run python -m src.main
 ```
 
 1. Select audio processes from the dropdowns

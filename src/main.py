@@ -4,7 +4,7 @@ import traceback
 
 from tkinter import ttk
 from pycaw.pycaw import AudioUtilities
-from src.__version__ import __version__
+from .__version__ import __version__
 
 
 class AudioProcess:
@@ -276,7 +276,7 @@ class VolumeBalancer:
 def main():
     root = tk.Tk()
     VolumeBalancer(root)
-    root.iconbitmap("./app.ico")
+    root.iconbitmap("./assets/app.ico")
     root.mainloop()
 
 

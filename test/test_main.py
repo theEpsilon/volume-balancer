@@ -2,6 +2,7 @@ import unittest
 import tkinter as tk
 import subprocess
 import time
+import re
 
 from pycaw.pycaw import AudioUtilities
 from src.main import VolumeBalancer
@@ -50,11 +51,14 @@ def terminate_audio_sessions(p1: subprocess, p2: subprocess):
     p1.wait()
     p2.wait()
 
+def _get_python_processes(all_values):
+    return [{"val": v, "pid": re.search(r"PID:\s*(\d+)", v).group(1)} for v in all_values if re.search(r"^python\.exe.*", v)]
+
 
 class GUIBaseTest(unittest.TestCase):
     def setUp(self):
-        self.root, self.app = setup()
         self.p1, self.p2 = create_mock_audio_sessions()
+        self.root, self.app = setup()
 
     def tearDown(self):
         terminate_audio_sessions(self.p1, self.p2)
@@ -64,10 +68,49 @@ class GUIBaseTest(unittest.TestCase):
         self.assertEqual(self.root.title(), f"Volume Balancer v{__version__}")
 
     def test_process_selection(self):
-        for session in AudioUtilities.GetAllSessions():
-            print(session)
-            if session.Process:
-                print(session.Process.pid, session.Process.name())
+        # Get initial values
+        v1, v2 = self.app.process1_combo["values"], self.app.process2_combo["values"]
+        p1, p2 = _get_python_processes(v1), _get_python_processes(v2)
+
+        self.assertEqual(len(p1), len(p2))
+        self.assertGreaterEqual(len(p1), 2)
+
+        initial_length_p1 = len(p1)
+        initial_length_p2 = len(p2)
+        
+        # Select one process and check other combobox values
+        self.app.process1_combo.set(p1[0]["val"])
+        self.app.process1_combo.event_generate("<<ComboboxSelected>>")
+
+        p2 = _get_python_processes(self.app.process2_combo["values"])
+
+        self.assertEqual(len(p2), initial_length_p2 - 1)
+        self.assertNotIn(p1[0]["val"], [v["val"] for v in p2])
+
+        # Select other value and check first combobox
+        self.app.process2_combo.set(p2[0]["val"])
+        self.app.process2_combo.event_generate("<<ComboboxSelected>>")
+
+        p1 = _get_python_processes(self.app.process1_combo["values"])
+
+        self.assertEqual(len(p1), initial_length_p1 - 1)
+        self.assertNotIn(p2[0]["val"], [v["val"] for v in p1])
+
+        # Clear combobox 1 and check combobox 2 values
+        self.app.unset1.invoke()
+        self.assertEqual(self.app.process1_combo.get(), "")
+
+        p2 = _get_python_processes(self.app.process2_combo["values"])
+
+        self.assertEqual(initial_length_p2, len(p2))
+
+        # Clear combobox 2 and check combobox 1 values
+        self.app.unset2.invoke()
+        self.assertEqual(self.app.process2_combo.get(), "")
+
+        p1 = _get_python_processes(self.app.process1_combo["values"])
+
+        self.assertEqual(initial_length_p1, len(p1))
 
 
     # Regular workflow

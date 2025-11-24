@@ -75,7 +75,8 @@ class VolumeBalancer:
         self.process1_combo.bind("<<ComboboxSelected>>", self.on_process1_selected)
         self.process1_combo.grid(row=1, column=0)
         
-        tk.Button(process1_frame, text="unset", command=lambda: self.clear_process1()).grid(row=1, column=1, padx=(10, 0))
+        self.unset1 = tk.Button(process1_frame, text="unset", command=lambda: self.clear_process1())
+        self.unset1.grid(row=1, column=1, padx=(10, 0))
         
         # Process 2 selection
         process2_frame = tk.Frame(self.root)
@@ -93,7 +94,8 @@ class VolumeBalancer:
         self.process2_combo.grid(row=1, column=0)
         self.process2_combo.bind("<<ComboboxSelected>>", self.on_process2_selected)
 
-        tk.Button(process2_frame, text="unset").grid(row=1, column=1, padx=(10, 0))
+        self.unset2 = tk.Button(process2_frame, text="unset", command=lambda: self.clear_process2())
+        self.unset2.grid(row=1, column=1, padx=(10, 0))
         
         # Volume Balancer
         balancer_frame = tk.Frame(self.root)

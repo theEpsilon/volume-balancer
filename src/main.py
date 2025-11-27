@@ -9,29 +9,32 @@ from .__version__ import __version__
 
 class AudioProcess:
     def __init__(self, session = None):
-        self.session = session
-        self.initial_vol = session.SimpleAudioVolume.GetMasterVolume()
+        self._session = session
+        self._initial_vol = session.SimpleAudioVolume.GetMasterVolume()
     
     def get_session(self):
-        return self.session
+        return self._session
 
     def get_initial_volume(self):
-        return self.initial_vol
+        return self._initial_vol
+
+    def get_volume(self):
+        return self._session.SimpleAudioVolume.GetMasterVolume()
 
     def set_volume(self, volume):
         try:
-            self.session.SimpleAudioVolume.SetMasterVolume(volume, None)
+            self._session.SimpleAudioVolume.SetMasterVolume(volume, None)
         except Exception:
-            print(traceback.print_exc())
+            traceback.print_exc()
 
     def reset_volume(self):
-        self.set_volume(self.initial_vol)
+        self.set_volume(self._initial_vol)
 
     def get_session_name(self):
-        return self.session.Process.name()
+        return self._session.Process.name()
 
     def get_session_pid(self):
-        return self.session.Process.pid
+        return self._session.Process.pid
 
     def get_readable_process_key(self):
         return f"{self.get_session_name()} (PID: {self.get_session_pid()})"
@@ -50,6 +53,7 @@ class VolumeBalancer:
         self.audio_sessions = {}
 
         self.balance_var = tk.DoubleVar(value=0.0)
+        self.balance_var.trace_add("write", self.update_volumes)
         
         self._create_widgets()
         self.setup_hotkeys()
@@ -108,7 +112,7 @@ class VolumeBalancer:
         slider_frame.pack()
         
         tk.Label(slider_frame, text="v", font=("Arial", 10)).pack(side=tk.TOP)
-        tk.Button(slider_frame, text="<<", command=lambda: self.set_balance(-1.0), height=1, width=2).pack(side=tk.LEFT, padx=5)
+        tk.Button(slider_frame, text="<<", command=lambda: self.balance_var.set(-1.0), height=1, width=2).pack(side=tk.LEFT, padx=5)
 
         self.balance_slider = tk.Scale(
             slider_frame,
@@ -117,13 +121,12 @@ class VolumeBalancer:
             resolution=0.1,
             orient=tk.HORIZONTAL,
             variable=self.balance_var,
-            command=self.set_balance,
             length=400,
             showvalue=False
         )
         self.balance_slider.pack(side=tk.LEFT, padx=5)
 
-        tk.Button(slider_frame, text=">>", command=lambda: self.set_balance(1.0), height=1, width=2).pack(side=tk.LEFT, padx=5)
+        tk.Button(slider_frame, text=">>", command=lambda: self.balance_var.set(1.0), height=1, width=2).pack(side=tk.LEFT, padx=5)
         
         ## Balance labels
         balance_label_frame = tk.Frame(balancer_frame)
@@ -151,12 +154,12 @@ class VolumeBalancer:
         tk.Label(self.root, text=help_text, font=("Arial", 7), fg="gray").pack(pady=5)
     
     def setup_hotkeys(self):
-        keyboard.add_hotkey('ctrl+alt+left', lambda: self.set_balance(self.balance_var.get() - 0.1))
-        keyboard.add_hotkey('ctrl+alt+right', lambda: self.set_balance(self.balance_var.get() + 0.1))
-        keyboard.add_hotkey('ctrl+shift+left', lambda: self.set_balance(-1.0))
-        keyboard.add_hotkey('ctrl+shift+right', lambda: self.set_balance(1.0))
-        keyboard.add_hotkey('ctrl+shift+down', lambda: self.set_balance(0.0))
-        keyboard.add_hotkey('ctrl+shift+up', lambda: self.set_balance(0.0))
+        keyboard.add_hotkey('ctrl+alt+left', lambda: self.balance_var.set(max(-1.0, self.balance_var.get() - 0.1)))
+        keyboard.add_hotkey('ctrl+alt+right', lambda: self.balance_var.set(min(1.0, self.balance_var.get() + 0.1)))
+        keyboard.add_hotkey('ctrl+shift+left', lambda: self.balance_var.set(-1.0))
+        keyboard.add_hotkey('ctrl+shift+right', lambda: self.balance_var.set(1.0))
+        keyboard.add_hotkey('ctrl+shift+down', lambda: self.balance_var.set(0.0))
+        keyboard.add_hotkey('ctrl+shift+up', lambda: self.balance_var.set(0.0))
     
     def on_closing(self):
         try:
@@ -252,26 +255,13 @@ class VolumeBalancer:
             self.process2 = None
             self.update_balance_labels()
             self.update_combobox_values()
-
-    def set_balance(self, value=None):
-        def update():
-            if value is not None:
-                try:
-                    float_value = max(-1.0, min(1.0, float(value)))
-                    self.balance_var.set(float_value)
-                except (ValueError, TypeError):
-                    pass
-            self.update_volumes()
-        self.root.after(0, update)
     
-    def update_volumes(self):
-        balance = self.balance_var.get()
-
+    def update_volumes(self, *args):
         if self.process1:
-            self.process1.set_volume(1.0 - max(balance, 0))
+            self.process1.set_volume(1.0 - max(self.balance_var.get(), 0))
         
         if self.process2:
-            self.process2.set_volume(1.0 + min(balance, 0))
+            self.process2.set_volume(1.0 + min(self.balance_var.get(), 0))
 
 def main():
     root = tk.Tk()

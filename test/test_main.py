@@ -1,9 +1,9 @@
-import time
 import unittest
 import tkinter as tk
 import re
-from unittest.mock import patch
+import test
 
+from unittest.mock import patch
 from src.main import VolumeBalancer
 from src.__version__ import __version__
 
@@ -114,6 +114,21 @@ class GUIBaseTest(unittest.TestCase):
 
         self.assertEqual(self.app.process1.get_volume(), 0.5)
         self.assertEqual(self.app.process2.get_volume(), 1)
+
+    def test_refresh_button(self):
+        v1, v2 = self.app.process1_combo["values"], self.app.process2_combo["values"]
+
+        self.assertEqual(len(v1), len(v2))
+        initialLength = len(v1)
+
+        test.audio_session_factory.spawn_session(pid=12345)
+
+        self.app.refresh_processes()
+
+        v1, v2 = self.app.process1_combo["values"], self.app.process2_combo["values"]
+
+        self.assertEqual(len(v1), initialLength + 1)
+        self.assertEqual(len(v2), initialLength + 1)
 
 class HotkeyTest(unittest.TestCase):
     def setUp(self):

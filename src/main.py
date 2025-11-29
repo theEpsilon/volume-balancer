@@ -141,13 +141,13 @@ class VolumeBalancer:
         self.process2_label.pack(side=tk.RIGHT)
         
         # Refresh button
-        refresh_btn = tk.Button(
+        self.refresh_btn = tk.Button(
             self.root,
             text="Refresh Process List",
             command=self.refresh_processes,
             font=("Arial", 9)
         )
-        refresh_btn.pack(pady=(25, 5))
+        self.refresh_btn.pack(pady=(25, 5))
         
         # Hotkey help label
         help_text = f"Hotkeys: Ctrl + Alt + Left/Right adjust balance | Ctrl + Shift + Left/Right/Down set extremes"

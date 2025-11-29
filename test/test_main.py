@@ -1,7 +1,9 @@
 import unittest
 import tkinter as tk
 import re
+import test
 
+from unittest.mock import patch
 from src.main import VolumeBalancer
 from src.__version__ import __version__
 
@@ -18,7 +20,6 @@ def teardown(root):
 def _get_python_processes(all_values):
     return [{"val": v, "pid": re.search(r"PID:\s*(\d+)", v).group(1)} for v in all_values if re.search(r"^python\.exe.*", v)]
 
-
 class GUIBaseTest(unittest.TestCase):
     def setUp(self):
         self.root, self.app = setup()
@@ -34,9 +35,6 @@ class GUIBaseTest(unittest.TestCase):
         v1, v2 = self.app.process1_combo["values"], self.app.process2_combo["values"]
         p1, p2 = _get_python_processes(v1), _get_python_processes(v2)
 
-        print(v1, v2)
-        print(p1, p2)
-
         self.assertEqual(len(p1), len(p2))
         self.assertGreaterEqual(len(p1), 2)
 
@@ -46,6 +44,10 @@ class GUIBaseTest(unittest.TestCase):
         # Select one process and check other combobox values
         self.app.process1_combo.set(p1[0]["val"])
         self.app.process1_combo.event_generate("<<ComboboxSelected>>")
+        self.root.update()
+
+        self.assertIsNotNone(self.app.process1)
+        self.assertEqual(self.app.process1_label.cget("text"), "python.exe")
 
         p2 = _get_python_processes(self.app.process2_combo["values"])
 
@@ -55,6 +57,10 @@ class GUIBaseTest(unittest.TestCase):
         # Select other value and check first combobox
         self.app.process2_combo.set(p2[0]["val"])
         self.app.process2_combo.event_generate("<<ComboboxSelected>>")
+        self.root.update()
+
+        self.assertIsNotNone(self.app.process2)
+        self.assertEqual(self.app.process2_label.cget("text"), "python.exe")
 
         p1 = _get_python_processes(self.app.process1_combo["values"])
 
@@ -63,6 +69,7 @@ class GUIBaseTest(unittest.TestCase):
 
         # Clear combobox 1 and check combobox 2 values
         self.app.unset1.invoke()
+        self.root.update()
         self.assertEqual(self.app.process1_combo.get(), "")
 
         p2 = _get_python_processes(self.app.process2_combo["values"])
@@ -71,18 +78,129 @@ class GUIBaseTest(unittest.TestCase):
 
         # Clear combobox 2 and check combobox 1 values
         self.app.unset2.invoke()
+        self.root.update()
         self.assertEqual(self.app.process2_combo.get(), "")
 
         p1 = _get_python_processes(self.app.process1_combo["values"])
 
         self.assertEqual(initial_length_p1, len(p1))
+        self.assertIsNone(self.app.process1)
+        self.assertIsNone(self.app.process2)
+        self.assertEqual(self.app.process1_label.cget("text"), "None selected")
+        self.assertEqual(self.app.process2_label.cget("text"), "None selected")
 
+    def test_balance_slider(self):
+        p1 = _get_python_processes(self.app.process1_combo["values"])
 
-    # Regular workflow
-    # Only one source selected
-    # Hotkeys
-    # Unset
-    # Refresh
+        self.app.process1_combo.set(p1[0]["val"])
+        self.app.process1_combo.event_generate("<<ComboboxSelected>>")
+        self.app.balance_slider.set(-0.5)
+        self.root.update()
+
+        self.assertIsNotNone(self.app.process1)
+        self.assertEqual(self.app.process1.get_volume(), 1)
+
+        p2 = _get_python_processes(self.app.process2_combo["values"])
+
+        self.app.process2_combo.set(p2[0]["val"])
+        self.app.process2_combo.event_generate("<<ComboboxSelected>>")
+        self.root.update()
+
+        self.assertIsNotNone(self.app.process2)
+        self.assertEqual(self.app.process2.get_volume(), 0.5)
+        
+        self.app.balance_slider.set(0.5)
+        self.root.update()
+
+        self.assertEqual(self.app.process1.get_volume(), 0.5)
+        self.assertEqual(self.app.process2.get_volume(), 1)
+
+    def test_refresh_button(self):
+        v1, v2 = self.app.process1_combo["values"], self.app.process2_combo["values"]
+
+        self.assertEqual(len(v1), len(v2))
+        initialLength = len(v1)
+
+        test.audio_session_factory.spawn_session(pid=12345)
+
+        self.app.refresh_processes()
+
+        v1, v2 = self.app.process1_combo["values"], self.app.process2_combo["values"]
+
+        self.assertEqual(len(v1), initialLength + 1)
+        self.assertEqual(len(v2), initialLength + 1)
+
+class HotkeyTest(unittest.TestCase):
+    def setUp(self):
+        self.root = tk.Tk()
+        self.root.withdraw()
+    
+    def tearDown(self):
+        teardown(self.root)
+    
+    @patch('src.main.keyboard')
+    def test_hotkey_registration(self, mock_keyboard):
+        VolumeBalancer(self.root)
+        expected_hotkeys = [
+            'ctrl+alt+left',
+            'ctrl+alt+right',
+            'ctrl+shift+left',
+            'ctrl+shift+right',
+            'ctrl+shift+down',
+            'ctrl+shift+up'
+        ]
+        
+        self.assertEqual(mock_keyboard.add_hotkey.call_count, len(expected_hotkeys))
+        
+        calls = mock_keyboard.add_hotkey.call_args_list
+        hotkey_strings = [call[0][0] for call in calls]
+        
+        for expected_key in expected_hotkeys:
+            self.assertIn(expected_key, hotkey_strings)
+    
+    @patch('src.main.keyboard')
+    def test_hotkey_callbacks(self, mock_keyboard):
+        app = VolumeBalancer(self.root)
+        
+        callbacks = {}
+        for call in mock_keyboard.add_hotkey.call_args_list:
+            hotkey = call[0][0]
+            callback = call[0][1]
+            callbacks[hotkey] = callback
+        
+        # ctrl+alt+left
+        app.balance_var.set(-0.9)
+        callbacks['ctrl+alt+left']()
+        self.assertEqual(app.balance_var.get(), -1.0)
+        callbacks['ctrl+alt+left']()
+        self.assertEqual(app.balance_var.get(), -1.0)
+        
+        # ctrl+alt+right
+        app.balance_var.set(0.9)
+        callbacks['ctrl+alt+right']()
+        self.assertEqual(app.balance_var.get(), 1.0)
+        callbacks['ctrl+alt+right']()
+        self.assertEqual(app.balance_var.get(), 1.0)
+        
+        # ctrl+shift+left
+        app.balance_var.set(0.5)
+        callbacks['ctrl+shift+left']()
+        self.assertEqual(app.balance_var.get(), -1.0)
+        
+        # ctrl+shift+right
+        app.balance_var.set(-0.5)
+        callbacks['ctrl+shift+right']()
+        self.assertEqual(app.balance_var.get(), 1.0)
+        
+        # ctrl+shift+down
+        app.balance_var.set(0.7)
+        callbacks['ctrl+shift+down']()
+        self.assertEqual(app.balance_var.get(), 0.0)
+        
+        # ctrl+shift+up
+        app.balance_var.set(-0.7)
+        callbacks['ctrl+shift+up']()
+        self.assertEqual(app.balance_var.get(), 0.0)
 
 if __name__ == "__main__":
     unittest.main()

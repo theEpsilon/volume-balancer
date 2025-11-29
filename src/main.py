@@ -154,8 +154,8 @@ class VolumeBalancer:
         tk.Label(self.root, text=help_text, font=("Arial", 7), fg="gray").pack(pady=5)
     
     def setup_hotkeys(self):
-        keyboard.add_hotkey('ctrl+alt+left', lambda: self.balance_var.set(max(-1.0, self.balance_var.get() - 0.1)))
-        keyboard.add_hotkey('ctrl+alt+right', lambda: self.balance_var.set(min(1.0, self.balance_var.get() + 0.1)))
+        keyboard.add_hotkey('ctrl+alt+left', lambda: self.reduce_balance())
+        keyboard.add_hotkey('ctrl+alt+right', lambda: self.increase_balance())
         keyboard.add_hotkey('ctrl+shift+left', lambda: self.balance_var.set(-1.0))
         keyboard.add_hotkey('ctrl+shift+right', lambda: self.balance_var.set(1.0))
         keyboard.add_hotkey('ctrl+shift+down', lambda: self.balance_var.set(0.0))
@@ -262,6 +262,12 @@ class VolumeBalancer:
         
         if self.process2:
             self.process2.set_volume(1.0 + min(self.balance_var.get(), 0))
+    
+    def reduce_balance(self, by=0.1):
+        self.balance_var.set(max(-1.0, self.balance_var.get() - by))
+
+    def increase_balance(self, by=0.1):
+        self.balance_var.set(min(1.0, self.balance_var.get() + by))
 
 def main():
     root = tk.Tk()

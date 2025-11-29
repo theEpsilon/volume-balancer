@@ -2,6 +2,7 @@ import time
 import unittest
 import tkinter as tk
 import re
+from unittest.mock import patch
 
 from src.main import VolumeBalancer
 from src.__version__ import __version__
@@ -18,7 +19,6 @@ def teardown(root):
 
 def _get_python_processes(all_values):
     return [{"val": v, "pid": re.search(r"PID:\s*(\d+)", v).group(1)} for v in all_values if re.search(r"^python\.exe.*", v)]
-
 
 class GUIBaseTest(unittest.TestCase):
     def setUp(self):
@@ -115,12 +115,77 @@ class GUIBaseTest(unittest.TestCase):
         self.assertEqual(self.app.process1.get_volume(), 0.5)
         self.assertEqual(self.app.process2.get_volume(), 1)
 
-
-    # Regular workflow
-    # Only one source selected
-    # Hotkeys
-    # Unset
-    # Refresh
+class HotkeyTest(unittest.TestCase):
+    def setUp(self):
+        self.root = tk.Tk()
+        self.root.withdraw()
+    
+    def tearDown(self):
+        teardown(self.root)
+    
+    @patch('src.main.keyboard')
+    def test_hotkey_registration(self, mock_keyboard):
+        VolumeBalancer(self.root)
+        expected_hotkeys = [
+            'ctrl+alt+left',
+            'ctrl+alt+right',
+            'ctrl+shift+left',
+            'ctrl+shift+right',
+            'ctrl+shift+down',
+            'ctrl+shift+up'
+        ]
+        
+        self.assertEqual(mock_keyboard.add_hotkey.call_count, len(expected_hotkeys))
+        
+        calls = mock_keyboard.add_hotkey.call_args_list
+        hotkey_strings = [call[0][0] for call in calls]
+        
+        for expected_key in expected_hotkeys:
+            self.assertIn(expected_key, hotkey_strings)
+    
+    @patch('src.main.keyboard')
+    def test_hotkey_callbacks(self, mock_keyboard):
+        app = VolumeBalancer(self.root)
+        
+        callbacks = {}
+        for call in mock_keyboard.add_hotkey.call_args_list:
+            hotkey = call[0][0]
+            callback = call[0][1]
+            callbacks[hotkey] = callback
+        
+        # ctrl+alt+left
+        app.balance_var.set(-0.9)
+        callbacks['ctrl+alt+left']()
+        self.assertEqual(app.balance_var.get(), -1.0)
+        callbacks['ctrl+alt+left']()
+        self.assertEqual(app.balance_var.get(), -1.0)
+        
+        # ctrl+alt+right
+        app.balance_var.set(0.9)
+        callbacks['ctrl+alt+right']()
+        self.assertEqual(app.balance_var.get(), 1.0)
+        callbacks['ctrl+alt+right']()
+        self.assertEqual(app.balance_var.get(), 1.0)
+        
+        # ctrl+shift+left
+        app.balance_var.set(0.5)
+        callbacks['ctrl+shift+left']()
+        self.assertEqual(app.balance_var.get(), -1.0)
+        
+        # ctrl+shift+right
+        app.balance_var.set(-0.5)
+        callbacks['ctrl+shift+right']()
+        self.assertEqual(app.balance_var.get(), 1.0)
+        
+        # ctrl+shift+down
+        app.balance_var.set(0.7)
+        callbacks['ctrl+shift+down']()
+        self.assertEqual(app.balance_var.get(), 0.0)
+        
+        # ctrl+shift+up
+        app.balance_var.set(-0.7)
+        callbacks['ctrl+shift+up']()
+        self.assertEqual(app.balance_var.get(), 0.0)
 
 if __name__ == "__main__":
     unittest.main()
